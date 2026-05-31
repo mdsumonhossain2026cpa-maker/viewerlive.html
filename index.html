@@ -15,51 +15,47 @@
     </style>
 </head>
 <body>
-
     <h2>📱 রিমোট ক্যামেরা ভিউয়ার</h2>
     <div class="status" id="status">ভিডিও দেখার জন্য কানেক্ট বাটনে চাপুন</div>
     
-    <video id="remoteVideo" autoplay playsinline controls style="transform: scaleX(1);"></video>
+    <video id="remoteVideo" autoplay playsinline controls></video>
     <br>
-
     <button class="btn-connect" id="connectBtn">🎥 লাইভ ক্যামেরা কানেক্ট করুন</button>
     <button class="btn-ctrl" id="flashBtn">🔦 টর্চ অন/অফ</button>
 
     <script>
         const peer = new Peer(); 
-        const CAMERA_ID = 'akash-remote-camera-123'; // ক্যামেরা আইডির সাথে মিল রাখা হয়েছে
+        const CAMERA_ID = 'akash-cam-12345';
         let dataConnection;
 
-        // কানেক্ট বাটনে ক্লিক করলে
+        // বাটনে ক্লিক করলে শুধু কানেকশন রিকোয়েস্ট পাঠানো হবে
         document.getElementById('connectBtn').addEventListener('click', () => {
-            document.getElementById('status').innerText = "ক্যামেরায় কল করা হচ্ছে...";
-
-            // ডাটা কানেকশন তৈরি করা (টর্চ লাইটের জন্য)
+            document.getElementById('status').innerText = "ক্যামেরার সাথে কানেক্ট করা হচ্ছে...";
+            
             dataConnection = peer.connect(CAMERA_ID);
+            
+            dataConnection.on('open', () => {
+                document.getElementById('status').innerText = "কানেকশন সফল! ভিডিও রিসিভ করা হচ্ছে...";
+            });
+        });
 
-            // ভিডিওর জন্য সরাসরি কল করা
-            const call = peer.call(CAMERA_ID, null); // আমরা নিজের ভিডিও পাঠাচ্ছি না, শুধু রিসিভ করব
+        // ক্যামেরা ফোন যখন ভিডিও পাঠাবে, তখন রিসিভ করা হবে
+        peer.on('call', (call) => {
+            call.answer(); // কল রিসিভ করা হলো
             
             call.on('stream', (remoteStream) => {
                 const videoElement = document.getElementById('remoteVideo');
                 videoElement.srcObject = remoteStream;
-                
-                // ব্রাউজারকে জোর করে প্লে করতে বলা
-                videoElement.play().catch(e => console.log("Auto-play prevented", e));
+                videoElement.play().catch(e => console.log("Play Error:", e));
                 document.getElementById('status').innerText = "✅ লাইভ ভিডিও সচল আছে!";
-            });
-            
-            call.on('error', (err) => {
-                document.getElementById('status').innerHTML = `<span style="color:red">কল ফেইল হয়েছে: ${err}</span>`;
             });
         });
 
-        // টর্চ লাইট কমান্ড
         document.getElementById('flashBtn').addEventListener('click', () => {
             if (dataConnection && dataConnection.open) {
                 dataConnection.send('toggle-flash');
             } else {
-                alert("ক্যামেরার সাথে আগে কানেক্ট করুন!");
+                alert("আগে ক্যামেরার সাথে কানেক্ট করুন!");
             }
         });
     </script>
