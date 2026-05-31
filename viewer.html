@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ভিউয়ার ফোন (Controller)</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #111; color: #fff; padding: 20px; }
+        video { width: 100%; max-width: 500px; border-radius: 10px; border: 3px solid #007bff; background: #000; }
+        button { padding: 12px 24px; font-size: 16px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-connect { background: #007bff; color: white; }
+        .btn-ctrl { background: #ffc107; color: black; }
+        .status { font-size: 16px; color: #aaa; margin: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>📱 রিমোট ক্যামেরা ভিউয়ার</h2>
+    <div class="status" id="status">কানেক্ট করার জন্য নিচের বাটনে চাপুন...</div>
+    
+    <video id="remoteVideo" autoplay playsinline style="transform: scaleX(1);"></video>
+    <br>
+
+    <button class="btn-connect" id="connectBtn">🎥 লাইভ ক্যামেরা কানেক্ট করুন</button>
+    <button class="btn-ctrl" id="flashBtn">🔦 টর্চ অন/অফ কমান্ড</button>
+
+    <script>
+        const peer = new Peer(); // ভিউয়ারের জন্য অটোমেটিক আইডি তৈরি হবে
+        const CAMERA_ID = 'my-secret-remote-camera-123'; // ক্যামেরা ফোনের আইডির সাথে মিল থাকতে হবে
+        let dataConnection;
+
+        peer.on('open', (id) => {
+            console.log('Viewer Peer ID: ' + id);
+        });
+
+        // ক্যামেরা ফোন থেকে আসা ভিডিও স্ট্রিম রিসিভ করা
+        peer.on('call', (call) => {
+            call.answer(); // কল রিসিভ করা (ভিউয়ার নিজের ভিডিও পাঠাবে না)
+            call.on('stream', (remoteStream) => {
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+                document.getElementById('status').innerText = "লাইভ ভিডিও সচল আছে...";
+            });
+        });
+
+        // কানেক্ট বাটনে ক্লিক করলে
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            document.getElementById('status').innerText = "কানেক্ট করার চেষ্টা করা হচ্ছে...";
+            // ডাটা এবং কমান্ড পাঠানোর জন্য কানেক্ট করা
+            dataConnection = peer.connect(CAMERA_ID);
+            
+            dataConnection.on('open', () => {
+                document.getElementById('status').innerText = "কানেকশন সফল! ভিডিও লোড হচ্ছে...";
+            });
+        });
+
+        // টর্চ লাইট কন্ট্রোল কমান্ড পাঠানো
+        document.getElementById('flashBtn').addEventListener('click', () => {
+            if (dataConnection && dataConnection.open) {
+                dataConnection.send('toggle-flash'); // ক্যামেরা ফোনে 'toggle-flash' মেসেজ পাঠানো হচ্ছে
+                document.getElementById('status').innerText = "ফ্ল্যাশলাইটের কমান্ড পাঠানো হয়েছে।";
+            } else {
+                alert("আগে 'লাইভ ক্যামেরা কানেক্ট করুন' বাটনে ক্লিক করে কানেক্ট করুন!");
+            }
+        });
+    </script>
+</body>
+</html>
