@@ -3,59 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ভিউয়ার ফোন (Controller)</title>
+    <title>রিমোট কন্ট্রোল প্যানেল</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #111; color: #fff; padding: 20px; }
-        video { width: 100%; max-width: 500px; border-radius: 10px; border: 3px solid #007bff; background: #000; }
-        button { padding: 12px 24px; font-size: 16px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-connect { background: #007bff; color: white; }
+        body { font-family: Arial, sans-serif; text-align: center; background: #111; color: #fff; padding: 15px; margin: 0; }
+        video { width: 100%; max-width: 500px; border-radius: 10px; border: 3px solid #007bff; background: #000; margin-bottom: 15px; }
+        
+        /* বাটনগুলোর ডিজাইন */
+        .btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 500px; margin: 0 auto; }
+        button { padding: 12px 10px; font-size: 14px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1 1 45%; transition: 0.3s; }
+        
+        .btn-connect { background: #007bff; color: white; width: 100%; flex: 1 1 100%; font-size: 16px; padding: 15px; }
         .btn-ctrl { background: #ffc107; color: black; }
+        .btn-snap { background: #17a2b8; color: white; }
+        .btn-mute { background: #6c757d; color: white; }
+        
+        .btn-rec { background: #dc3545; color: white; }
+        .btn-rec.recording { background: #28a745; animation: blink 1.5s infinite; }
+        
         .status { font-size: 16px; color: #00ff00; margin: 10px; }
+        @keyframes blink { 50% { opacity: 0.6; } }
     </style>
 </head>
 <body>
-    <h2>📱 রিমোট ক্যামেরা ভিউয়ার</h2>
-    <div class="status" id="status">ভিডিও দেখার জন্য কানেক্ট বাটনে চাপুন</div>
+    <h2>📱 রিমোট কন্ট্রোল প্যানেল</h2>
+    <div class="status" id="status">ভিডিও দেখার জন্য কানেক্ট করুন</div>
     
-    <video id="remoteVideo" autoplay playsinline controls></video>
-    <br>
-    <button class="btn-connect" id="connectBtn">🎥 লাইভ ক্যামেরা কানেক্ট করুন</button>
-    <button class="btn-ctrl" id="flashBtn">🔦 টর্চ অন/অফ</button>
+    <video id="remoteVideo" autoplay playsinline></video>
+    
+    <div class="btn-group">
+        <button class="btn-connect" id="connectBtn">🎥 লাইভ কানেক্ট করুন</button>
+        <button class="btn-ctrl" id="switchBtn">🔄 ক্যামেরা পাল্টান</button>
+        <button class="btn-ctrl" id="flashBtn">🔦 টর্চ অন/অফ</button>
+        <button class="btn-mute" id="muteBtn">🔊 মিউট/আনমিউট</button>
+        <button class="btn-snap" id="snapBtn">📸 স্ক্রিনশট নিন</button>
+        <button class="btn-rec" id="recBtn">🔴 রেকর্ড শুরু করুন</button>
+    </div>
 
     <script>
         const peer = new Peer(); 
         const CAMERA_ID = 'akash-cam-12345';
         let dataConnection;
+        
+        // রেকর্ডিংয়ের ভেরিয়েবল
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
 
-        // বাটনে ক্লিক করলে শুধু কানেকশন রিকোয়েস্ট পাঠানো হবে
+        const videoElement = document.getElementById('remoteVideo');
+
         document.getElementById('connectBtn').addEventListener('click', () => {
-            document.getElementById('status').innerText = "ক্যামেরার সাথে কানেক্ট করা হচ্ছে...";
-            
+            document.getElementById('status').innerText = "কানেক্ট করা হচ্ছে...";
             dataConnection = peer.connect(CAMERA_ID);
-            
             dataConnection.on('open', () => {
-                document.getElementById('status').innerText = "কানেকশন সফল! ভিডিও রিসিভ করা হচ্ছে...";
+                document.getElementById('status').innerText = "ভিডিও রিসিভ করা হচ্ছে...";
             });
         });
 
-        // ক্যামেরা ফোন যখন ভিডিও পাঠাবে, তখন রিসিভ করা হবে
         peer.on('call', (call) => {
-            call.answer(); // কল রিসিভ করা হলো
-            
+            call.answer(); 
             call.on('stream', (remoteStream) => {
-                const videoElement = document.getElementById('remoteVideo');
                 videoElement.srcObject = remoteStream;
-                videoElement.play().catch(e => console.log("Play Error:", e));
+                videoElement.play().catch(e => console.log(e));
                 document.getElementById('status').innerText = "✅ লাইভ ভিডিও সচল আছে!";
             });
         });
 
-        document.getElementById('flashBtn').addEventListener('click', () => {
-            if (dataConnection && dataConnection.open) {
-                dataConnection.send('toggle-flash');
+        // সিগন্যাল পাঠানোর ফাংশন
+        function sendCommand(cmd) {
+            if (dataConnection && dataConnection.open) dataConnection.send(cmd);
+            else alert("আগে লাইভ কানেক্ট করুন!");
+        }
+
+        // টর্চ এবং ক্যামেরা পাল্টানো
+        document.getElementById('flashBtn').addEventListener('click', () => sendCommand('toggle-flash'));
+        document.getElementById('switchBtn').addEventListener('click', () => sendCommand('switch-camera'));
+
+        // অডিও মিউট/আনমিউট
+        document.getElementById('muteBtn').addEventListener('click', () => {
+            videoElement.muted = !videoElement.muted;
+            document.getElementById('muteBtn').innerText = videoElement.muted ? "🔇 মিউট করা আছে" : "🔊 আনমিউট করা আছে";
+            document.getElementById('muteBtn').style.background = videoElement.muted ? "#dc3545" : "#6c757d";
+        });
+
+        // 📸 স্ক্রিনশট নেওয়ার কোড
+        document.getElementById('snapBtn').addEventListener('click', () => {
+            if (!videoElement.srcObject) return alert("ভিডিও চালু নেই!");
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            canvas.getContext('2d').drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            
+            const link = document.createElement('a');
+            link.download = `Camera_Screenshot_${new Date().getTime()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click(); // সাথে সাথে ফোনে ডাউনলোড হয়ে যাবে
+        });
+
+        // 🔴 ভিডিও রেকর্ড করার কোড
+        document.getElementById('recBtn').addEventListener('click', () => {
+            if (!videoElement.srcObject) return alert("ভিডিও চালু নেই!");
+            
+            if (!isRecording) {
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(videoElement.srcObject);
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `Camera_Record_${new Date().getTime()}.webm`;
+                    link.click(); // রেকর্ডিং শেষে ফোনে সেভ হবে
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                document.getElementById('recBtn').innerText = "⏹️ রেকর্ড বন্ধ করুন";
+                document.getElementById('recBtn').classList.add('recording');
             } else {
-                alert("আগে ক্যামেরার সাথে কানেক্ট করুন!");
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('recBtn').innerText = "🔴 রেকর্ড শুরু করুন";
+                document.getElementById('recBtn').classList.remove('recording');
             }
         });
     </script>
